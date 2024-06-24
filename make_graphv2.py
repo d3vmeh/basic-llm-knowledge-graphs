@@ -42,8 +42,18 @@ def create_chunks(path, replace_newlines=False):
 def graph_prompt(input: str, llm: Client, metadata = {}):
     system_prompt = (
         "You are a network graph maker who extracts terms and their relations from a given context. "
-        "You are provided with a context chunk (delimited by ```) Your task is to extract the ontology "
-        "of terms mentioned in the given context. These terms should represent the key concepts as per the context. \n"
+        "You are provided with a context chunk (delimited by ```) Your task is to extract the terms "
+        "mentioned in the given context using the following ontology:\n"
+        "**labels**: Person: Person name without any adjectives},"
+        "Place",
+        "Object",
+        "Document",
+        "Concept",
+        "Organisation",
+        "Event",
+        "Action\n"
+        "**relationships**: relationships between any two labeled entities\n"
+        "These terms should represent the key concepts as per the context. \n"
         "Thought 1: While traversing through each sentence, Think about the key terms mentioned in it.\n"
             "\tTerms may include object, entity, location, organization, person, \n"
             "\tcondition, acronym, documents, service, concept, etc.\n"
