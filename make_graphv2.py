@@ -16,6 +16,7 @@ import networkx as nx
 import seaborn as sns
 import random
 from pyvis.network import Network
+import pickle
 
 
 def load_doc(path):
@@ -51,8 +52,8 @@ def graph_prompt(input: str, llm: Client, metadata = {}):
             "\tTerms that are mentioned in the same sentence or the same paragraph are typically related to each other.\n"
             "\tTerms can be related to many other terms\n\n"
         "Thought 3: Find out the relation between each such related pair of terms. \n\n"
-        "Format your output as a list of json. Each element of the list contains a pair of terms"
-        "and the relation between them, like the follwing: \n"
+        "Format your output as a list of json and do not say anything before or after the list. Each element of the list contains a pair of terms" #You must include the '@#$' in front of the first openingsquare bracket and after the last closing square bracket. Do not forget any of the square brackets or curly brackets under any circumstance.
+        "and the relation between them, like the following: \n"
         "[\n"
         "   {\n"
         '       "node_1": "A concept from extracted ontology",\n'
@@ -75,20 +76,37 @@ def graph_prompt(input: str, llm: Client, metadata = {}):
    
     response = response['response']
     #print(response)
-    if "[" not in response and "]" not in response:
+
+    #r1 = response.split("@#$")
+    #response = r1[1]
+    print(response)
+    if "[" not in response or "]" not in response:
         print("Error generating response, trying again with input:", input)
         graph_prompt(input, llm)
-    x = response.index("[")
-    x1 = response.index("]")
-    response = response[x:x1+1]
-
+        return ""
+    #try:
+    #    x = response.index("[")
+    #    x1 = response[::-1].index("]")
+    #except:
+    #   print("Error in response parsing, trying again with input:", input)
+    #   print("=====================================")
+    #   print("here waqs the response:", response)
+    #   print("=====================================")
+    #   graph_prompt(input, llm)
+    #   return ""
+    
+    #response = response[x:x1+1]
+    #print(x,x1,response)
+    
     
     #result = response['response']
+    r = response
     try:
         response = json.loads(response)
     except:
         print("Error in json parsing")
         print(response)
+        response = r
     #f = open("response.txt", "w")
     #f.write(str(response))
    # f.close()
@@ -141,144 +159,175 @@ def colors_to_community(communities):
     return df_colors
 
 
+def preprocess_text(path: str)-> pd.DataFrame: 
+    #path = "./PDFs/"
+    print("Creating chunks from PDFs...")
+    docs = create_chunks(path, replace_newlines=True)
+    print("Chunks created")
 
-path = "./PDFs/"
-print("Creating chunks from PDFs...")
-docs = create_chunks(path, replace_newlines=True)
-print("Chunks created")
+    num_chunks = len(docs)
 
-num_chunks = len(docs)
+    chunk_id = 0
+    docs_text = []
 
-chunk_id = 0
-docs_text = []
+    df = pd.DataFrame(columns = ["chunk_text", "chunk_source","chunk_id"])
 
-df = pd.DataFrame(columns = ["chunk_text", "chunk_source","chunk_id"])
+    for d in docs:
 
-for d in docs:
-
-    df = df._append({"chunk_text":d.page_content, "chunk_source":d.metadata["page"], "chunk_id":str(chunk_id)}, ignore_index=True)
-    chunk_id += 1
-
-
-#print(df.head())
-for doc in docs:
-    docs_text.append(doc.page_content)
-
-doc1 = docs_text[0]
-#for d in docs:
-    #print(d.metadata["page"])
-
-model = "llama3"
-llm = Ollama(model=model, temperature = 0, top_p = 0.6)
+        df = df._append({"chunk_text":d.page_content, "chunk_source":d.metadata["page"], "chunk_id":str(chunk_id)}, ignore_index=True)
+        chunk_id += 1
 
 
+    #print(df.head())
+    for doc in docs:
+        docs_text.append(doc.page_content)
 
-responses = []
-print("Number of chunks to create graph from:", len(docs_text))
-for i in range(len(docs_text)): 
-    response = graph_prompt(docs_text[i], llm)
+    doc1 = docs_text[0]
+    #for d in docs:
+        #print(d.metadata["page"])
+
+    model = "llama3"
+    llm = Ollama(model=model, temperature = 0, top_p = 0.6)
+
+
+
+    responses = []
+    print("Number of chunks to create graph from:", len(docs_text))
+    for i in range(len(docs_text)): 
+        response = graph_prompt(docs_text[i], llm)
+        
+        print(f"Chunk {i} completed")
+        #print(response)
+        responses.append(response)
+        #if i == 4:#REMOVE LATERREMOVE LATERREMOVE LATERREMOVE LATERREMOVE LATERREMOVE LATER
+        #    break
+        #break#NEED TO REMOVE THIS BREAK LATER
+    nodes_df = pd.DataFrame(columns = ["node_1", "node_2", "edge", "chunk_id"])
+
+    for response in responses:
+        #print("Response:",response[0])
+        count = 0
+        for item in response:
+
+            item["chunk_id"] = str(count)
+            #print(list(item.values()))
+            #print(r)
+            #print(len(list(item.values())), len(nodes_df.columns))
+            l = list(item.values())
+            #df.loc[df.index] = [1,2,3,4]
+            nodes_df = nodes_df._append(item, ignore_index=True)
+            #df = pd.concat([df, pd.DataFrame([item])], ignore_index=True)
+            count += 1
     
-    print(f"Chunk {i} completed")
-    #print(response)
-    responses.append(response)
-    #if i == 4:#REMOVE LATERREMOVE LATERREMOVE LATERREMOVE LATERREMOVE LATERREMOVE LATER
-    #    break
-    #break#NEED TO REMOVE THIS BREAK LATER
-
-
-
-
-nodes_df = pd.DataFrame(columns = ["node_1", "node_2", "edge", "chunk_id"])
-
-for response in responses:
-    #print("Response:",response[0])
-    
-    
-    count = 0
-    for item in response:
-
-        item["chunk_id"] = str(count)
-        #print(list(item.values()))
-        #print(r)
-        #print(len(list(item.values())), len(nodes_df.columns))
-        l = list(item.values())
-        #df.loc[df.index] = [1,2,3,4]
-        nodes_df = nodes_df._append(item, ignore_index=True)
-        #df = pd.concat([df, pd.DataFrame([item])], ignore_index=True)
-        count += 1
-    
-for i in range(3):
-    print(nodes_df.iloc[i])
-    print("\n\n")
+    return nodes_df
+    #for i in range(3):
+    #    print(nodes_df.iloc[i])
+    #    print("\n\n")
 
 #print(nodes_df.head())  
 
-nodes_df2 = contextual_proximity(nodes_df)
-#print(nodes_df2)
+def get_context(nodes_df: pd.DataFrame):
+    #nodes_df = preprocess_text("./PDFs/")
+    nodes_df2 = contextual_proximity(nodes_df)
+    #print(nodes_df2)
 
-nodes_df = pd.concat([nodes_df, nodes_df2], axis=0)
-nodes_df = (
-    nodes_df.groupby(["node_1", "node_2"])
-    .agg({"chunk_id": ",".join, "edge": ','.join, 'count': 'sum'})
-    .reset_index()
-)
+    nodes_df = pd.concat([nodes_df, nodes_df2], axis=0)
+    nodes_df = (
+        nodes_df.groupby(["node_1", "node_2"])
+        .agg({"chunk_id": ",".join, "edge": ','.join, 'count': 'sum'})
+        .reset_index()
+    )
 
-#print(nodes_df)
-
-
-nodes = pd.concat([nodes_df["node_1"], nodes_df["node_2"]], axis = 0).unique()
-print("\n\n\n\n")
-#print(nodes_df.columns)
-
-G = nx.Graph()
-
-nodes_df.to_pickle("nodes_df.pkl")
+    #print(nodes_df)
 
 
-for node in nodes:
-    G.add_node(str(node))
+    nodes = pd.concat([nodes_df["node_1"], nodes_df["node_2"]], axis = 0).unique()
+
+    return nodes_df, nodes
+
+def save_df(nodes_df:pd.DataFrame, path:str = "./nodes_df.pkl"):
+    nodes_df.to_pickle(path)
+
+def load_df(path:str = "./nodes_df.pkl"):
+    return pd.read_pickle(path)
+
+def save_communities(communities, path:str = "./communities.txt"):
+    with open(path, "wb") as f:
+        pickle.dump(communities, f)
+
+def load_communities(path:str = "./communities.txt"):
+    with open(path, "rb") as f:
+        return pickle.load(f)
+
+def set_graph_object(nodes_df: pd.DataFrame, nodes: list):
+    G = nx.Graph()
+
+    for node in nodes:
+        G.add_node(str(node))
 
 #for x in nodes_df.iterrows():
     #print(x)
 
 
 #print(nodes_df.columns)
-for index, row in nodes_df.iterrows():
-    #print(row)
+    for index, row in nodes_df.iterrows():
+        #print(row)
+        
+        #print(row["edge"])
+        G.add_edge(str(row["node_1"]), str(row["node_2"]), title = row["edge"], weight = row["count"]/2)
+
+    return G
+
+
+def create_communities(G: nx.Graph):
+    communities_generator = nx.community.girvan_newman(G)
+    top_level_communities = next(communities_generator)
+    next_level_communities = next(communities_generator)
+    communities = sorted(map(sorted, next_level_communities))
+    print("Number of communities:",len(communities))
+    print(communities)
+
+    #file = open("communities.txt", "w")
+    #file.write(str(communities))
+    #file.close()
+
+    #with open("communities.txt", "w") as f:
+    #    pickle.dump(communities, f)
+    save_communities(communities)
+
+    #print("Communities are:",type(communities))
+    palette = sns.color_palette("hls", len(communities))
+    return G, communities
+
+
+def color_graph(G, communities):
+    colors = colors_to_community(communities)
+
+    for index, row in colors.iterrows():
+        G.nodes[row["node"]]["color"] = row["color"]
+        G.nodes[row["node"]]["group"] = row["group"]   
+        G.nodes[row["node"]]["size"] = G.degree[row["node"]]
+
+    return G
+
+def create_graph(nodes_df_path:str = "./nodes_df.pkl", graph_path:str = "./graphs/index.html"):
+    #nodes_df = preprocess_text("./PDFs/")
     
-    #print(row["edge"])
-    G.add_edge(str(row["node_1"]), str(row["node_2"]), title = row["edge"], weight = row["count"]/4)
+    nodes_df = load_df(nodes_df_path)
+    nodes_df, nodes = get_context(nodes_df)
 
-communities_generator = nx.community.girvan_newman(G)
-top_level_communities = next(communities_generator)
-next_level_communities = next(communities_generator)
-communities = sorted(map(sorted, next_level_communities))
-print("Number of communities:",len(communities))
-print(communities)
+    G = set_graph_object(nodes_df, nodes)
 
-file = open("communities.txt", "w")
-file.write(str(communities))
-file.close()
+    G, communities = create_communities(G)
+    
+    G = color_graph(G, communities)
 
+ 
 
-print("Communities are:",type(communities))
-palette = sns.color_palette("hls", len(communities))
-
-
-colors = colors_to_community(communities)
-
-for index, row in colors.iterrows():
-    G.nodes[row["node"]]["color"] = row["color"]
-    G.nodes[row["node"]]["group"] = row["group"]   
-    G.nodes[row["node"]]["size"] = G.degree[row["node"]]
-
-
-graph_path = "./graphs/index.html"
-
-net = Network(notebook = False, cdn_resources= "remote", height = "900px", width = "100%", select_menu=True, filter_menu=False)
-
-
-net.from_nx(G)
-net.force_atlas_2based(central_gravity=0.015, gravity = -31)
-net.show_buttons(filter_=['physics'])
-net.show(graph_path, notebook = False)
+    print_communities(communities)
+    graph_path = "./graphs/index.html"
+    net = Network(notebook = False, cdn_resources= "remote", height = "900px", width = "100%", select_menu=True, filter_menu=False)
+    net.from_nx(G)
+    net.force_atlas_2based(central_gravity=0.015, gravity = -31)
+    net.show_buttons(filter_=['physics'])
+    net.show(graph_path, notebook = False)
