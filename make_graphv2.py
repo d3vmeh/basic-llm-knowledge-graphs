@@ -72,17 +72,33 @@ def graph_prompt(input: str, llm: Client, metadata = {}):
     #print(type(response))
     #result = json.loads(response)
     #return [dict(item, **metadata) for item in response]
+   
     response = response['response']
     #print(response)
+    if "[" not in response and "]" not in response:
+        print("Error generating response, trying again with input:", input)
+        graph_prompt(input, llm)
     x = response.index("[")
     x1 = response.index("]")
     response = response[x:x1+1]
+
+    
     #result = response['response']
-    response = json.loads(response)
+    try:
+        response = json.loads(response)
+    except:
+        print("Error in json parsing")
+        print(response)
+    #f = open("response.txt", "w")
+    #f.write(str(response))
+   # f.close()
     return [dict(item, **metadata) for item in response]
 
 
+
 def contextual_proximity(df: pd.DataFrame):
+
+
     ## Melt the dataframe into a list of nodes
     dfg_long = pd.melt(
         df, id_vars=["chunk_id"], value_vars=["node_1", "node_2"], value_name="node"
@@ -111,7 +127,7 @@ def contextual_proximity(df: pd.DataFrame):
     return dfg2
     
 def colors_to_community(communities):
-    palette = sns.color_palette("hsv", len(communities)).as_hex()
+    palette = sns.color_palette("hls", len(communities)).as_hex()
     random.shuffle(palette)
     rows = []
     group = 0
@@ -127,7 +143,9 @@ def colors_to_community(communities):
 
 
 path = "./PDFs/"
+print("Creating chunks from PDFs...")
 docs = create_chunks(path, replace_newlines=True)
+print("Chunks created")
 
 num_chunks = len(docs)
 
@@ -156,7 +174,8 @@ llm = Ollama(model=model, temperature = 0, top_p = 0.6)
 
 
 responses = []
-for i in range(len(docs_text)):
+print("Number of chunks to create graph from:", len(docs_text))
+for i in range(len(docs_text)): 
     response = graph_prompt(docs_text[i], llm)
     
     print(f"Chunk {i} completed")
@@ -213,6 +232,9 @@ print("\n\n\n\n")
 
 G = nx.Graph()
 
+nodes_df.to_pickle("nodes_df.pkl")
+
+
 for node in nodes:
     G.add_node(str(node))
 
@@ -234,7 +256,14 @@ communities = sorted(map(sorted, next_level_communities))
 print("Number of communities:",len(communities))
 print(communities)
 
-palette = sns.color_palette("hsv", len(communities))
+file = open("communities.txt", "w")
+file.write(str(communities))
+file.close()
+
+
+print("Communities are:",type(communities))
+palette = sns.color_palette("hls", len(communities))
+
 
 colors = colors_to_community(communities)
 
@@ -251,5 +280,5 @@ net = Network(notebook = False, cdn_resources= "remote", height = "900px", width
 
 net.from_nx(G)
 net.force_atlas_2based(central_gravity=0.015, gravity = -31)
-net.show_buttons(filter_=["physics"])
+net.show_buttons(filter_=['physics'])
 net.show(graph_path, notebook = False)
