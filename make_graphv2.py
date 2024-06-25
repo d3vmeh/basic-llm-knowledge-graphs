@@ -43,14 +43,14 @@ def graph_prompt(input: str, llm: Client, metadata = {}):
     system_prompt = (
         "You are a network graph maker who extracts terms and their relations from a given context. "
         "You are provided with a context chunk (delimited by ```) Your task is to extract the terms "
-        "mentioned in the given context using the following ontology:\n"
-        "**labels**: Person: Person name without any adjectives},"
-        "Place",
-        "Object",
-        "Document",
-        "Concept",
-        "Organisation",
-        "Event",
+        "mentioned in the given context using the following ontology. Assign each entity a label from the ontology. Here is the ontology:\n"
+        "**labels**: Person: the name of a person without any adjectives,"
+        "Place, "
+        "Object, "
+        "Document, "
+        "Concept, "
+        "Organisation, "
+        "Event, "
         "Action\n"
         "**relationships**: relationships between any two labeled entities\n"
         "These terms should represent the key concepts as per the context. \n"
@@ -334,7 +334,7 @@ def create_graph(nodes_df_path:str = "./nodes_df.pkl", graph_path:str = "./graph
 
  
 
-    print_communities(communities)
+    #print_communities(communities)
     graph_path = "./graphs/index.html"
     net = Network(notebook = False, cdn_resources= "remote", height = "900px", width = "100%", select_menu=True, filter_menu=False)
     net.from_nx(G)
