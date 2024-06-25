@@ -42,18 +42,8 @@ def create_chunks(path, replace_newlines=False):
 def graph_prompt(input: str, llm: Client, metadata = {}):
     system_prompt = (
         "You are a network graph maker who extracts terms and their relations from a given context. "
-        "You are provided with a context chunk (delimited by ```) Your task is to extract the terms "
-        "mentioned in the given context using the following ontology. Assign each entity a label from the ontology. Here is the ontology:\n"
-        "**labels**: Person: the name of a person without any adjectives,"
-        "Place, "
-        "Object, "
-        "Document, "
-        "Concept, "
-        "Organisation, "
-        "Event, "
-        "Action\n"
-        "**relationships**: relationships between any two labeled entities\n"
-        "These terms should represent the key concepts as per the context. \n"
+        "You are provided with a context chunk (delimited by ```) Your task is to extract the ontology "
+        "of terms mentioned in the given context. These terms should represent the key concepts as per the context. \n"
         "Thought 1: While traversing through each sentence, Think about the key terms mentioned in it.\n"
             "\tTerms may include object, entity, location, organization, person, \n"
             "\tcondition, acronym, documents, service, concept, etc.\n"
@@ -120,7 +110,12 @@ def graph_prompt(input: str, llm: Client, metadata = {}):
     #f = open("response.txt", "w")
     #f.write(str(response))
    # f.close()
-    return [dict(item, **metadata) for item in response]
+    try:
+        return [dict(item, **metadata) for item in response]
+    except:
+        print("Error returning from graphprompt(), tryin again")
+        graph_prompt(input)
+        return ""
 
 
 
@@ -321,9 +316,9 @@ def color_graph(G, communities):
     return G
 
 def create_graph(nodes_df_path:str = "./nodes_df.pkl", graph_path:str = "./graphs/index.html"):
-    #nodes_df = preprocess_text("./PDFs/")
+    nodes_df = preprocess_text("./PDFs/")
     
-    nodes_df = load_df(nodes_df_path)
+    #nodes_df = load_df(nodes_df_path)
     nodes_df, nodes = get_context(nodes_df)
 
     G = set_graph_object(nodes_df, nodes)
@@ -332,7 +327,8 @@ def create_graph(nodes_df_path:str = "./nodes_df.pkl", graph_path:str = "./graph
     
     G = color_graph(G, communities)
 
- 
+    save_df(nodes_df)
+
 
     #print_communities(communities)
     graph_path = "./graphs/index.html"
@@ -341,3 +337,4 @@ def create_graph(nodes_df_path:str = "./nodes_df.pkl", graph_path:str = "./graph
     net.force_atlas_2based(central_gravity=0.015, gravity = -31)
     net.show_buttons(filter_=['physics'])
     net.show(graph_path, notebook = False)
+    return G

@@ -2,6 +2,6 @@ __pycache__/
 PDFs/
 graphs/
 communities.txt
-nodes_df.pkl
 response.txt
 zmake_graph.py
+nodes_df.pkl

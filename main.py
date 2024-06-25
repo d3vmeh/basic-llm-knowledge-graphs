@@ -12,17 +12,17 @@ def get_response(query,context1,prompt,model,conversations=""):
     for c in context1:
         s += c + "\n"
     print(s)
-    prompt = prompt_template.format(community_summaries=s, question=query)
+    #prompt = prompt_template.format(community_summaries=s, question=query)
 
     response_text = model.invoke(prompt)
 
-    sources = [doc.metadata.get("source", None) for doc in s]
+    #sources = [doc.metadata.get("source", None) for doc in s]
     formatted_response = f"Response: {response_text}\n"#Sources: {sources}"
     return formatted_response, response_text
 #nodes_df = mg.preprocess_text("./PDFs/")
 #mg.save_df(nodes_df)
 
-nodes_df = mg.load_df()
+#nodes_df = mg.load_df()
 
 print("\ncreating communintites...")
 #nodes_df, nodes = mg.get_context(nodes_df)
@@ -33,6 +33,8 @@ print("Communities created and saved")
 
 #mg.create_graph()
 communities = mg.load_communities()
+nodes_df = mg.load_df()
+
 
 print(nodes_df)
 
@@ -52,7 +54,7 @@ community_summaries = []
 for i, community in enumerate(communities):
     print(f"Community {i+1}: {community}")
     client = Client()
-    a = client.generate(model="llama3", prompt = f"Here is the community, please create a title for it: {community}", system="You are analyzing a knowledge graph with nodes connected by relationships and grouped into communities. Please create a title for the given community.")   
+    #a = client.generate(model="llama3", prompt = f"Here is the community, please create a title for it: {community}", system="You are analyzing a knowledge graph with nodes connected by relationships and grouped into communities. Please create a title for the given community.")   
     x = client.generate(model="llama3", prompt = f"Here is the community, please summarize it: {community}", system="You are analyzing a knowledge graph with nodes connected by relationships and grouped into communities. Please summarize the given community 2 sentences.")   
 
     
@@ -61,23 +63,24 @@ for i, community in enumerate(communities):
     community_summaries.append(x['response'])
 
 
+#Here is the context you can use to help you answer the questions:
 
-prompt = """
-Answer the question only using the community summaries. Here are the community summaries you can use:
 
-Here is the context you can use to help you answer the questions. Keep the answer brief:
-{community_summaries}
-
-If you do not know the answer, do not make up an answer, just say you do not know. 
-
-Answer the question based on the above context: {question}
-"""
 
 
 model = Ollama(model="llama3")
 
 while True:
     q = input("Enter a question: ")
+    prompt = f"""
+    Answer the question only by only reading the community summaries for your understanding. Do not access any outside information. Here are the community summaries you can learn from:
+
+    {community_summaries}
+
+    If you do not know the answer, do not make up an answer, just say you do not know. 
+
+    Answer the question based on the above context: {q}
+    """
     if q.lower() == "exit":
         exit()
     x, response_text = get_response(q,community_summaries,prompt,model)
